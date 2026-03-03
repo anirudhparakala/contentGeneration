@@ -1,6 +1,6 @@
 run_mode:
   manual: true
-  recency_days: 14
+  recency_days: 30
 
 caps:
   max_entries_per_source: 50

@@ -1,21 +1,124 @@
 newsletters:
-  - id: "substack_ai_automation_1"
-    name: "Sample AI Automation Newsletter"
-    feed_url: "https://example.substack.com/feed"
-    tags: ["ai", "automation", "make-money"]
+  # --- keep (5–6) from previous list ---
+  - id: "future_tools_1"
+    name: "Future Tools"
+    feed_url: "https://futuretools.beehiiv.com/feed"
+    tags: ["ai", "tools", "workflows", "monetization"]
 
-  - id: "blog_growth_ops_1"
-    name: "Sample Growth Ops Blog"
-    feed_url: "https://example.com/rss.xml"
-    tags: ["growth", "ops", "funnels"]
+  - id: "workflow_substack_1"
+    name: "The Workflow"
+    feed_url: "https://theworkflow.substack.com/feed"
+    tags: ["ai", "marketing", "workflows", "gtm", "monetization"]
+
+  - id: "ai_automation_newsletter_1"
+    name: "AI Automation Newsletter"
+    feed_url: "https://aiautomation.news/feed"
+    tags: ["ai", "automation", "agents", "workflows", "agency"]
+
+  - id: "matt_schlicht_1"
+    name: "Matt Schlicht's AI Newsletter"
+    feed_url: "https://mattprd.com/feed"
+    tags: ["ai", "agents", "entrepreneurship", "monetization"]
+
+  # --- replace the rest with monetization / agency / workflow focused sources ---
+  - id: "zapier_blog_workflows_1"
+    name: "Zapier Blog (Automation Workflows)"
+    feed_url: "https://zapier.com/blog/feeds/latest/"
+    tags: ["automation", "workflows", "ops", "productivity"]
+
+  - id: "n8n_blog_workflows_1"
+    name: "n8n Blog (Workflow Automation)"
+    feed_url: "https://blog.n8n.io/rss"
+    tags: ["automation", "workflows", "agents", "ops"]
+
+  - id: "hubspot_growth_marketing_1"
+    name: "HubSpot Marketing Blog (Growth/Acquisition)"
+    feed_url: "https://blog.hubspot.com/marketing/rss.xml"
+    tags: ["growth", "funnels", "marketing", "monetization"]
+
+  - id: "ahrefs_growth_seo_1"
+    name: "Ahrefs Blog (SEO/Growth)"
+    feed_url: "https://ahrefs.com/blog/feed/"
+    tags: ["growth", "seo", "acquisition", "monetization"]
+
+  - id: "indie_hackers_bootstrapping_1"
+    name: "Indie Hackers (Bootstrapping/Monetization)"
+    feed_url: "https://www.indiehackers.com/feed.xml"
+    tags: ["bootstrapping", "saas", "monetization", "operators"]
+
 
 youtube:
-  - id: "yt_ai_agents_1"
-    name: "Sample AI Agents Channel"
-    channel_id: "UCxxxxxxxxxxxxxxxxxxxxxx"
-    tags: ["ai", "agents", "automation"]
+  - id: "yt_nate_herk_1"
+    name: "Nate Herk | AI Automation"
+    channel_id: "UC2ojq-nuP8ceeHqiroeKhBA"
+    tags: ["ai", "automation", "agency", "monetization"]
 
-  - id: "yt_saas_growth_1"
-    name: "Sample SaaS Growth Channel"
-    channel_id: "UCyyyyyyyyyyyyyyyyyyyyyy"
-    tags: ["growth", "saas", "marketing"]
+  - id: "yt_liam_ottley_1"
+    name: "Liam Ottley"
+    channel_id: "UCui4jxDaMb53Gdh-AZUTPAg"
+    tags: ["ai", "automation", "agency", "offers"]
+
+  - id: "yt_mark_kashef_1"
+    name: "Mark Kashef"
+    channel_id: "UCHkzp52CldSPZqU5T49mOnA"
+    tags: ["ai", "automation", "workflows", "agency"]
+
+  - id: "yt_greg_isenberg_1"
+    name: "Greg Isenberg"
+    channel_id: "UCPjNBjflYl0-HQtUvOx0Ibw"
+    tags: ["ai", "startup-ideas", "monetization", "operators"]
+
+  - id: "yt_matt_wolfe_1"
+    name: "Matt Wolfe"
+    channel_id: "UChpleBmo18P08aKCIgti38g"
+    tags: ["ai", "tools", "workflows", "operator"]
+
+  - id: "yt_futurepedia_1"
+    name: "Futurepedia"
+    channel_id: "UC_RovKmk0OCbuZjA8f08opw"
+    tags: ["ai", "tools", "reviews", "use-cases"]
+
+  - id: "yt_lex_fridman_1"
+    name: "Lex Fridman"
+    channel_id: "UCSHZKyawb77ixDdsGog4iWA"
+    tags: ["ai", "founders", "strategy", "long-form"]
+
+  - id: "yt_no_priors_1"
+    name: "No Priors"
+    channel_id: "UCSI7h9hydQ40K5MJHnCrQvw"
+    tags: ["ai", "startups", "operators", "investing"]
+
+  - id: "yt_kevin_stratvert_1"
+    name: "Kevin Stratvert"
+    channel_id: "UCfJT_eYDTmDE-ovKaxVE1ig"
+    tags: ["automation", "tutorials", "workflows", "productivity"]
+
+  - id: "yt_aiwithbrandon_1"
+    name: "aiwithbrandon"
+    channel_id: "UCEzrs7gK6Nf6t_tadEprzxQ"
+    tags: ["ai", "agents", "workflows", "builder"]
+
+  - id: "yt_zapier_1"
+    name: "Zapier"
+    channel_id: "UCEvsxF4Z12vwpwDUaU02yiA"
+    tags: ["automation", "workflows", "ops", "tools"]
+
+  - id: "yt_convertkit_creator_ed_1"
+    name: "ConvertKit Creator Education (archive)"
+    channel_id: "UCbRXu3AcxPyVumb3c3enLwA"
+    tags: ["creator", "email", "funnels", "monetization"]
+
+  - id: "yt_beehiiv_1"
+    name: "beehiiv"
+    channel_id: "UCI80tsW3wYNGEJLxwJo42vw"
+    tags: ["newsletter-business", "growth", "monetization", "ops"]
+
+  - id: "yt_theprimeagen_1"
+    name: "ThePrimeagen"
+    channel_id: "UC-ew9TfeD887qUSiWWAAj1w"
+    tags: ["dev", "ai", "automation", "builder-mindset"]
+
+  - id: "yt_automation_squad_1"
+    name: "Automation Squad"
+    channel_id: "UC-cTCLsyrD8M36m35i9Nm6g"
+    tags: ["n8n", "automation", "templates", "workflows"]

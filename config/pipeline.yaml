@@ -18,3 +18,60 @@ http:
 paths:
   sqlite_db: "data/state_stage1_refresh.db"
   outputs_dir: "data/outputs"
+
+stage_3_filter:
+  min_content_chars: 120
+  min_relevance_score: 3
+  max_candidates_default: 100
+  keyword_groups:
+    ai_automation:
+      weight: 1
+      terms:
+        - ai
+        - agent
+        - agents
+        - automation
+        - automated
+        - workflow
+        - workflows
+        - zapier
+        - n8n
+        - make.com
+        - make
+        - integromat
+        - webhook
+        - api
+        - llm
+        - gpt
+        - openai
+        - prompt
+        - prompts
+        - tool
+        - tools
+    monetization:
+      weight: 2
+      terms:
+        - monetize
+        - monetization
+        - revenue
+        - profit
+        - income
+        - side hustle
+        - hustle
+        - agency
+        - client
+        - clients
+        - lead
+        - leads
+        - outreach
+        - funnel
+        - funnels
+        - sales
+        - offer
+        - offers
+        - retainer
+        - pricing
+        - cold email
+        - cold outreach
+        - freelanc
+        - consulting

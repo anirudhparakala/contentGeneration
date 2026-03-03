@@ -1,0 +1,6 @@
+data/state.db
+data/outputs/*
+.env
+.venv
+__pycache__/
+.pytest_cache/

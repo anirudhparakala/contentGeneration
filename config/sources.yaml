@@ -1,0 +1,21 @@
+newsletters:
+  - id: "substack_ai_automation_1"
+    name: "Sample AI Automation Newsletter"
+    feed_url: "https://example.substack.com/feed"
+    tags: ["ai", "automation", "make-money"]
+
+  - id: "blog_growth_ops_1"
+    name: "Sample Growth Ops Blog"
+    feed_url: "https://example.com/rss.xml"
+    tags: ["growth", "ops", "funnels"]
+
+youtube:
+  - id: "yt_ai_agents_1"
+    name: "Sample AI Agents Channel"
+    channel_id: "UCxxxxxxxxxxxxxxxxxxxxxx"
+    tags: ["ai", "agents", "automation"]
+
+  - id: "yt_saas_growth_1"
+    name: "Sample SaaS Growth Channel"
+    channel_id: "UCyyyyyyyyyyyyyyyyyyyyyy"
+    tags: ["growth", "saas", "marketing"]

@@ -24,6 +24,11 @@ from .state import CandidatesStore, StateError
 
 LOGGER = logging.getLogger(__name__)
 FAIL_REASONS = ("missing_required_fields", "content_too_short", "low_relevance_score")
+NEWSLETTER_PASS_BREAKDOWN_KEYS = (
+    "passed_standard_threshold",
+    "passed_relaxed_threshold",
+    "passed_trusted_source_bypass",
+)
 
 
 class FatalFilterError(RuntimeError):
@@ -45,6 +50,7 @@ class Stage3FilterConfig:
     min_content_chars: int
     min_relevance_score: int
     max_candidates_default: int
+    newsletter_policy: "NewsletterPolicyConfig"
     keyword_groups: dict[str, KeywordGroup]
 
 
@@ -71,10 +77,59 @@ class FilterResult:
     candidates_skipped_already_present: int
     max_candidates: int
     reached_max_candidates: bool
+    evaluated_pass_total: int
+    evaluated_newsletter_pass_total: int
+    selected_newsletter_count: int
+    selected_non_newsletter_count: int
+    newsletter_quota_target: int
+    newsletter_quota_met: bool
     fail_breakdown: dict[str, int]
+    newsletter_pass_breakdown: dict[str, int]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class NewsletterPolicyConfig:
+    min_candidates_per_run: int
+    min_relevance_score: int
+    trusted_source_ids: frozenset[str]
+    trusted_sources_bypass_score: bool
+
+
+@dataclass(frozen=True)
+class EvaluatedPassItem:
+    item_id: str
+    source_type: str
+    source_id: str
+    source_name: str
+    creator: str
+    title: str
+    url: str
+    published_at: str
+    fetched_at: str
+    content_text: str
+    relevance_score: int
+    matched_keywords: list[str]
+    newsletter_pass_category: str | None
+
+    def to_candidate(self, *, scored_at: str) -> CandidateItem:
+        return CandidateItem(
+            item_id=self.item_id,
+            source_type=self.source_type,
+            source_id=self.source_id,
+            source_name=self.source_name,
+            creator=self.creator,
+            title=self.title,
+            url=self.url,
+            published_at=self.published_at,
+            fetched_at=self.fetched_at,
+            content_text=self.content_text,
+            relevance_score=self.relevance_score,
+            matched_keywords=self.matched_keywords,
+            scored_at=scored_at,
+        )
 
 
 def run_filter(
@@ -109,12 +164,22 @@ def run_filter(
     db_path = Path(db_path_override or pipeline.paths.sqlite_db)
 
     fail_breakdown = {reason: 0 for reason in FAIL_REASONS}
+    newsletter_pass_breakdown = {key: 0 for key in NEWSLETTER_PASS_BREAKDOWN_KEYS}
     items_considered = 0
+    evaluated_pass_total = 0
+    evaluated_newsletter_pass_total = 0
     passed_count = 0
     failed_count = 0
     inserted_db = 0
     candidate_items_emitted = 0
     candidates_skipped_already_present = 0
+    selected_newsletter_count = 0
+    selected_non_newsletter_count = 0
+    effective_newsletter_quota = min(
+        pipeline.stage_3_filter.newsletter_policy.min_candidates_per_run,
+        max_candidates,
+    )
+    newsletter_quota_met = False
 
     LOGGER.info(
         "stage_3_filter start run_id=%s db_path=%s output_path=%s max_candidates=%s",
@@ -131,66 +196,98 @@ def run_filter(
         items_available_total = store.count_unprocessed_items()
         unprocessed_rows = store.iter_unprocessed_items()
 
+        selected_final: list[EvaluatedPassItem] = []
+        if max_candidates > 0:
+            passed_all: list[EvaluatedPassItem] = []
+            passed_newsletters: list[EvaluatedPassItem] = []
+
+            for row in unprocessed_rows:
+                items_considered += 1
+                required = normalize_required_fields(row)
+                if required is None:
+                    failed_count += 1
+                    fail_breakdown["missing_required_fields"] += 1
+                    continue
+
+                body_text = select_body_text(
+                    summary=row.get("summary"),
+                    content_text=row.get("content_text"),
+                )
+                if len(body_text) < pipeline.stage_3_filter.min_content_chars:
+                    failed_count += 1
+                    fail_breakdown["content_too_short"] += 1
+                    continue
+
+                relevance_score, matched_keywords = score_relevance(
+                    title=required["title"],
+                    body_text=body_text,
+                    keyword_groups=pipeline.stage_3_filter.keyword_groups,
+                )
+                pass_newsletter_category = _passes_newsletter_relevance_gate(
+                    source_type=required["source_type"],
+                    source_id=required["source_id"],
+                    relevance_score=relevance_score,
+                    stage_config=pipeline.stage_3_filter,
+                )
+                if pass_newsletter_category is False:
+                    failed_count += 1
+                    fail_breakdown["low_relevance_score"] += 1
+                    continue
+
+                newsletter_category: str | None = None
+                if isinstance(pass_newsletter_category, str):
+                    newsletter_category = pass_newsletter_category
+
+                passed_item = EvaluatedPassItem(
+                    item_id=required["item_id"],
+                    source_type=required["source_type"],
+                    source_id=required["source_id"],
+                    source_name=required["source_name"],
+                    creator=required["creator"],
+                    title=required["title"],
+                    url=required["url"],
+                    published_at=required["published_at"],
+                    fetched_at=required["fetched_at"],
+                    content_text=body_text,
+                    relevance_score=relevance_score,
+                    matched_keywords=matched_keywords,
+                    newsletter_pass_category=newsletter_category,
+                )
+                passed_all.append(passed_item)
+
+                if passed_item.source_type == "newsletter":
+                    passed_newsletters.append(passed_item)
+                    if passed_item.newsletter_pass_category is not None:
+                        newsletter_pass_breakdown[passed_item.newsletter_pass_category] += 1
+
+            evaluated_pass_total = len(passed_all)
+            evaluated_newsletter_pass_total = len(passed_newsletters)
+            selected_final = _select_with_newsletter_quota(
+                passed_all=passed_all,
+                passed_newsletters=passed_newsletters,
+                max_candidates=max_candidates,
+                newsletter_quota=effective_newsletter_quota,
+            )
+
+        passed_count = len(selected_final)
+        selected_newsletter_count = sum(1 for item in selected_final if item.source_type == "newsletter")
+        selected_non_newsletter_count = passed_count - selected_newsletter_count
+        newsletter_quota_met = selected_newsletter_count >= effective_newsletter_quota
+
         out_file.parent.mkdir(parents=True, exist_ok=True)
         with out_file.open("w", encoding="utf-8", newline="\n") as out_handle:
-            if max_candidates > 0:
-                for row in unprocessed_rows:
-                    if passed_count == max_candidates:
-                        break
+            for selected in selected_final:
+                scored_at = utc_now_z()
+                candidate = selected.to_candidate(scored_at=scored_at)
+                inserted = store.insert_candidate(candidate, created_at=scored_at)
+                if not inserted:
+                    candidates_skipped_already_present += 1
+                    continue
 
-                    items_considered += 1
-                    required = normalize_required_fields(row)
-                    if required is None:
-                        failed_count += 1
-                        fail_breakdown["missing_required_fields"] += 1
-                        continue
-
-                    body_text = select_body_text(
-                        summary=row.get("summary"),
-                        content_text=row.get("content_text"),
-                    )
-                    if len(body_text) < pipeline.stage_3_filter.min_content_chars:
-                        failed_count += 1
-                        fail_breakdown["content_too_short"] += 1
-                        continue
-
-                    relevance_score, matched_keywords = score_relevance(
-                        title=required["title"],
-                        body_text=body_text,
-                        keyword_groups=pipeline.stage_3_filter.keyword_groups,
-                    )
-                    if relevance_score < pipeline.stage_3_filter.min_relevance_score:
-                        failed_count += 1
-                        fail_breakdown["low_relevance_score"] += 1
-                        continue
-
-                    passed_count += 1
-                    scored_at = utc_now_z()
-                    candidate = CandidateItem(
-                        item_id=required["item_id"],
-                        source_type=required["source_type"],
-                        source_id=required["source_id"],
-                        source_name=required["source_name"],
-                        creator=required["creator"],
-                        title=required["title"],
-                        url=required["url"],
-                        published_at=required["published_at"],
-                        fetched_at=required["fetched_at"],
-                        content_text=body_text,
-                        relevance_score=relevance_score,
-                        matched_keywords=matched_keywords,
-                        scored_at=scored_at,
-                    )
-
-                    inserted = store.insert_candidate(candidate, created_at=scored_at)
-                    if not inserted:
-                        candidates_skipped_already_present += 1
-                        continue
-
-                    inserted_db += 1
-                    candidate_items_emitted += 1
-                    out_handle.write(json.dumps(candidate.to_dict(), ensure_ascii=True))
-                    out_handle.write("\n")
+                inserted_db += 1
+                candidate_items_emitted += 1
+                out_handle.write(json.dumps(candidate.to_dict(), ensure_ascii=True))
+                out_handle.write("\n")
     except StateError as exc:
         raise FatalFilterError(str(exc)) from exc
     except OSError as exc:
@@ -217,7 +314,14 @@ def run_filter(
         candidates_skipped_already_present=candidates_skipped_already_present,
         max_candidates=max_candidates,
         reached_max_candidates=reached_max_candidates,
+        evaluated_pass_total=evaluated_pass_total,
+        evaluated_newsletter_pass_total=evaluated_newsletter_pass_total,
+        selected_newsletter_count=selected_newsletter_count,
+        selected_non_newsletter_count=selected_non_newsletter_count,
+        newsletter_quota_target=effective_newsletter_quota,
+        newsletter_quota_met=newsletter_quota_met,
         fail_breakdown=fail_breakdown,
+        newsletter_pass_breakdown=newsletter_pass_breakdown,
     )
     _validate_result_invariants(result)
 
@@ -235,7 +339,7 @@ def run_filter(
         )
 
     LOGGER.info(
-        "stage_3_filter complete run_id=%s items_available_total=%s items_considered=%s passed_count=%s failed_count=%s inserted_db=%s candidate_items_emitted=%s candidates_skipped_already_present=%s reached_max_candidates=%s",
+        "stage_3_filter complete run_id=%s items_available_total=%s items_considered=%s passed_count=%s failed_count=%s inserted_db=%s candidate_items_emitted=%s candidates_skipped_already_present=%s reached_max_candidates=%s selected_newsletter_count=%s newsletter_quota_target=%s newsletter_quota_met=%s",
         run_id,
         items_available_total,
         items_considered,
@@ -245,6 +349,9 @@ def run_filter(
         candidate_items_emitted,
         candidates_skipped_already_present,
         reached_max_candidates,
+        selected_newsletter_count,
+        effective_newsletter_quota,
+        newsletter_quota_met,
     )
     return result
 
@@ -276,6 +383,13 @@ def _load_pipeline_config(path: str | Path) -> PipelineConfig:
         stage.get("max_candidates_default"), "stage_3_filter.max_candidates_default"
     )
     try:
+        newsletter_policy = _parse_newsletter_policy(
+            stage.get("newsletter_policy"),
+            max_candidates_default=max_candidates_default,
+        )
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+    try:
         keyword_groups = compile_keyword_groups(stage.get("keyword_groups"))
     except ValueError as exc:
         raise ConfigError(str(exc)) from exc
@@ -286,6 +400,7 @@ def _load_pipeline_config(path: str | Path) -> PipelineConfig:
             min_content_chars=min_content_chars,
             min_relevance_score=min_relevance_score,
             max_candidates_default=max_candidates_default,
+            newsletter_policy=newsletter_policy,
             keyword_groups=keyword_groups,
         ),
     )
@@ -318,8 +433,8 @@ def _resolve_report_path(*, report_path: str | None, outputs_dir: Path, date: da
 
 def _validate_result_invariants(result: FilterResult) -> None:
     fail_breakdown_total = sum(result.fail_breakdown.values())
-    if result.items_considered != (result.passed_count + result.failed_count):
-        raise FatalFilterError("counter invariant failed: items_considered != passed_count + failed_count")
+    newsletter_breakdown_total = sum(result.newsletter_pass_breakdown.values())
+    expected_quota_met = result.selected_newsletter_count >= result.newsletter_quota_target
     if result.inserted_db != result.candidate_items_emitted:
         raise FatalFilterError("counter invariant failed: inserted_db != candidate_items_emitted")
     if result.items_considered > result.items_available_total:
@@ -328,9 +443,29 @@ def _validate_result_invariants(result: FilterResult) -> None:
         raise FatalFilterError("counter invariant failed: candidate_items_emitted > max_candidates")
     if result.failed_count != fail_breakdown_total:
         raise FatalFilterError("counter invariant failed: failed_count != fail_breakdown total")
+    if result.passed_count > result.evaluated_pass_total:
+        raise FatalFilterError("counter invariant failed: passed_count > evaluated_pass_total")
+    if result.items_considered != (result.evaluated_pass_total + result.failed_count):
+        raise FatalFilterError("counter invariant failed: items_considered != evaluated_pass_total + failed_count")
     if result.passed_count != (result.inserted_db + result.candidates_skipped_already_present):
         raise FatalFilterError(
             "counter invariant failed: passed_count != inserted_db + candidates_skipped_already_present"
+        )
+    if result.selected_newsletter_count + result.selected_non_newsletter_count != result.passed_count:
+        raise FatalFilterError(
+            "counter invariant failed: selected_newsletter_count + selected_non_newsletter_count != passed_count"
+        )
+    if result.evaluated_newsletter_pass_total != newsletter_breakdown_total:
+        raise FatalFilterError(
+            "counter invariant failed: evaluated_newsletter_pass_total != newsletter_pass_breakdown total"
+        )
+    if result.selected_newsletter_count > result.evaluated_newsletter_pass_total:
+        raise FatalFilterError(
+            "counter invariant failed: selected_newsletter_count > evaluated_newsletter_pass_total"
+        )
+    if result.newsletter_quota_met != expected_quota_met:
+        raise FatalFilterError(
+            "counter invariant failed: newsletter_quota_met != (selected_newsletter_count >= newsletter_quota_target)"
         )
 
 
@@ -357,3 +492,118 @@ def _to_utc_z(value: datetime) -> str:
 
 def _is_non_bool_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _parse_newsletter_policy(raw_policy: Any, *, max_candidates_default: int) -> NewsletterPolicyConfig:
+    if not isinstance(raw_policy, dict):
+        raise ValueError("stage_3_filter.newsletter_policy must be a mapping")
+
+    min_candidates_per_run = _parse_non_negative_int(
+        raw_policy.get("min_candidates_per_run"),
+        "stage_3_filter.newsletter_policy.min_candidates_per_run",
+    )
+    min_relevance_score = _parse_non_negative_int(
+        raw_policy.get("min_relevance_score"),
+        "stage_3_filter.newsletter_policy.min_relevance_score",
+    )
+    trusted_source_ids = _parse_trusted_source_ids(raw_policy.get("trusted_source_ids"))
+
+    trusted_sources_bypass_score = raw_policy.get("trusted_sources_bypass_score")
+    if not isinstance(trusted_sources_bypass_score, bool):
+        raise ValueError("stage_3_filter.newsletter_policy.trusted_sources_bypass_score must be a boolean")
+
+    if min_candidates_per_run > max_candidates_default:
+        raise ValueError(
+            "stage_3_filter.newsletter_policy.min_candidates_per_run must be <= "
+            "stage_3_filter.max_candidates_default"
+        )
+
+    return NewsletterPolicyConfig(
+        min_candidates_per_run=min_candidates_per_run,
+        min_relevance_score=min_relevance_score,
+        trusted_source_ids=frozenset(trusted_source_ids),
+        trusted_sources_bypass_score=trusted_sources_bypass_score,
+    )
+
+
+def _parse_trusted_source_ids(value: Any) -> set[str]:
+    if not isinstance(value, list):
+        raise ValueError("stage_3_filter.newsletter_policy.trusted_source_ids must be a list")
+
+    canonical_ids: set[str] = set()
+    for raw_source_id in value:
+        if not isinstance(raw_source_id, str):
+            raise ValueError("stage_3_filter.newsletter_policy.trusted_source_ids entries must be strings")
+        canonical = raw_source_id.strip().lower()
+        if not canonical:
+            raise ValueError(
+                "stage_3_filter.newsletter_policy.trusted_source_ids entries must be non-empty after strip()"
+            )
+        if canonical in canonical_ids:
+            raise ValueError(
+                "stage_3_filter.newsletter_policy.trusted_source_ids must be unique after canonicalization"
+            )
+        canonical_ids.add(canonical)
+
+    return canonical_ids
+
+
+def _passes_newsletter_relevance_gate(
+    *,
+    source_type: str,
+    source_id: str,
+    relevance_score: int,
+    stage_config: Stage3FilterConfig,
+) -> str | bool:
+    if source_type != "newsletter":
+        return relevance_score >= stage_config.min_relevance_score
+    return _classify_newsletter_pass(
+        source_id=source_id,
+        relevance_score=relevance_score,
+        stage_config=stage_config,
+    )
+
+
+def _classify_newsletter_pass(
+    *,
+    source_id: str,
+    relevance_score: int,
+    stage_config: Stage3FilterConfig,
+) -> str | bool:
+    if relevance_score >= stage_config.min_relevance_score:
+        return "passed_standard_threshold"
+
+    newsletter_policy = stage_config.newsletter_policy
+    if relevance_score >= newsletter_policy.min_relevance_score:
+        return "passed_relaxed_threshold"
+
+    source_id_canonical = source_id.strip().lower()
+    if (
+        newsletter_policy.trusted_sources_bypass_score
+        and source_id_canonical in newsletter_policy.trusted_source_ids
+    ):
+        return "passed_trusted_source_bypass"
+    return False
+
+
+def _select_with_newsletter_quota(
+    *,
+    passed_all: list[EvaluatedPassItem],
+    passed_newsletters: list[EvaluatedPassItem],
+    max_candidates: int,
+    newsletter_quota: int,
+) -> list[EvaluatedPassItem]:
+    selected_newsletters = passed_newsletters[:newsletter_quota]
+    selected_newsletter_ids = {item.item_id for item in selected_newsletters}
+    remaining_capacity = max_candidates - len(selected_newsletters)
+
+    selected_remainder: list[EvaluatedPassItem] = []
+    if remaining_capacity > 0:
+        for item in passed_all:
+            if item.item_id in selected_newsletter_ids:
+                continue
+            selected_remainder.append(item)
+            if len(selected_remainder) == remaining_capacity:
+                break
+
+    return selected_newsletters + selected_remainder

@@ -23,6 +23,14 @@ stage_3_filter:
   min_content_chars: 120
   min_relevance_score: 3
   max_candidates_default: 100
+  newsletter_policy:
+    min_candidates_per_run: 20
+    min_relevance_score: 3
+    trusted_source_ids:
+      - zapier_blog_workflows_1
+      - n8n_blog_workflows_1
+      - hubspot_growth_marketing_1
+    trusted_sources_bypass_score: true
   keyword_groups:
     ai_automation:
       weight: 1
@@ -75,3 +83,43 @@ stage_3_filter:
         - cold outreach
         - freelanc
         - consulting
+
+stage_4_enrich:
+  max_items_default: 50
+  selection_policy:
+    min_newsletters_per_run: 10
+    min_youtube_per_run: 10
+    max_items_per_source: 2
+    source_diversity_first_pass: true
+  cooldown_policy:
+    enabled: true
+    after_consecutive_failures: 1
+    skip_for_hours: 24
+    reasons:
+      - newsletter_fetch_failed
+      - newsletter_extract_failed
+      - newsletter_text_too_short
+      - youtube_video_id_parse_failed
+      - youtube_asr_failed
+      - youtube_text_too_short
+  youtube_enrichment:
+    mode: asr_only
+    require_full_success: false
+    audio:
+      format_selector: "bestaudio"
+      extract_format: "wav"
+      download_timeout_s: 180
+      download_retries: 2
+      retry_backoff_s: 2.0
+    asr:
+      model: "distil-large-v3"
+      device: "cuda"
+      compute_type: "float16"
+      language: "en"
+      beam_size: 5
+      temperature: 0.0
+      condition_on_previous_text: false
+      vad_filter: true
+      max_audio_seconds: 7200
+      min_chars: 800
+      allow_cpu_fallback: false

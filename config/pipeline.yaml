@@ -154,3 +154,13 @@ sheets:
 
 stage_7_persist:
   max_rows_default: 200
+
+deliver:
+  enabled: true
+  channel: "slack"
+  slack_webhook_url: "https://hooks.slack.com/services/T00000000/B00000000/REPLACE_ME"
+  max_items_per_run: 10
+  max_script_chars: 1200
+  min_viral_rating: 5
+  include_only_status: []
+  dry_run: false

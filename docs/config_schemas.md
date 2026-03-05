@@ -90,6 +90,16 @@ sheets:
 
 stage_7_persist:
   max_rows_default: 200
+
+deliver:
+  enabled: true
+  channel: "slack"
+  slack_webhook_url: "https://hooks.slack.com/services/T00000000/B00000000/REPLACE_ME"
+  max_items_per_run: 10
+  max_script_chars: 1200
+  min_viral_rating: 5
+  include_only_status: []
+  dry_run: false
 ```
 
 ### `stage_3_filter` Validation Rules
@@ -144,3 +154,16 @@ stage_7_persist:
 
 ### `stage_7_persist` Validation Rules
 - `max_rows_default`: non-boolean integer >= `0`
+
+### `deliver` Validation Rules
+- `enabled`: boolean
+- `channel`: non-empty string after `strip()`, must be `slack`
+- if `enabled` is `true`:
+  - `slack_webhook_url`: non-empty string after `strip()`, must start with:
+    - `https://hooks.slack.com/services/`
+    - `https://hooks.slack-gov.com/services/`
+- `max_items_per_run`: non-boolean integer >= `0`
+- `max_script_chars`: non-boolean integer >= `80`
+- `min_viral_rating`: null or non-boolean integer in `[1, 10]`
+- `include_only_status`: list of strings and must be empty (`[]`) for Stage 8
+- `dry_run`: boolean

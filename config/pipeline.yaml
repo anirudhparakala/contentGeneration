@@ -19,6 +19,20 @@ paths:
   sqlite_db: "data/state_stage1_refresh.db"
   outputs_dir: "data/outputs"
 
+llm:
+  provider: "openai"
+  model: "gpt-4o-mini"
+  temperature: 0.2
+  max_output_tokens: 900
+  requests_per_minute_soft: 30
+  request_timeout_s: 60
+  retry_max_attempts: 3
+  retry_backoff_initial_s: 1.0
+  retry_backoff_multiplier: 2.0
+  retry_backoff_max_s: 8.0
+  api_key_env_var: "OPENAI_API_KEY"
+  api_key: ""
+
 stage_3_filter:
   min_content_chars: 120
   min_relevance_score: 3
@@ -123,3 +137,7 @@ stage_4_enrich:
       max_audio_seconds: 7200
       min_chars: 800
       allow_cpu_fallback: false
+
+stage_5_intelligence:
+  max_items_default: 25
+  input_max_chars: 12000

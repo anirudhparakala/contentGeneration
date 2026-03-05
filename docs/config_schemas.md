@@ -59,6 +59,24 @@ stage_3_filter:
     monetization:
       weight: 2
       terms: ["revenue", "side hustle", "cold email", "freelanc"]
+
+llm:
+  provider: "openai"
+  model: "gpt-4o-mini"
+  temperature: 0.2
+  max_output_tokens: 900
+  requests_per_minute_soft: 30
+  request_timeout_s: 60
+  retry_max_attempts: 3
+  retry_backoff_initial_s: 1.0
+  retry_backoff_multiplier: 2.0
+  retry_backoff_max_s: 8.0
+  api_key_env_var: "OPENAI_API_KEY"
+  api_key: ""
+
+stage_5_intelligence:
+  max_items_default: 25
+  input_max_chars: 12000
 ```
 
 ### `stage_3_filter` Validation Rules
@@ -79,3 +97,21 @@ stage_3_filter:
     - phrase term: has spaces, and each token matches `[a-z0-9]+(?:\.[a-z0-9]+)*`
   - invalid examples: leading/middle `*`, repeated `*`, or tokens like `ai-tools`
   - backward compatibility canonicalization: normalized `freelanc` is interpreted as `freelanc*`
+
+### `llm` Validation Rules
+- `provider`: non-empty string; currently only `openai` is allowed
+- `model`: non-empty string
+- `temperature`: non-boolean number between `0` and `2` inclusive
+- `max_output_tokens`: non-boolean integer >= `1`
+- `requests_per_minute_soft`: non-boolean integer >= `1`
+- `request_timeout_s`: non-boolean integer >= `1`
+- `retry_max_attempts`: non-boolean integer >= `1`
+- `retry_backoff_initial_s`: non-boolean number > `0`
+- `retry_backoff_multiplier`: non-boolean number >= `1`
+- `retry_backoff_max_s`: non-boolean number >= `retry_backoff_initial_s`
+- `api_key_env_var`: non-empty string
+- `api_key`: string (may be empty)
+
+### `stage_5_intelligence` Validation Rules
+- `max_items_default`: non-boolean integer >= `0`
+- `input_max_chars`: non-boolean integer >= `1`

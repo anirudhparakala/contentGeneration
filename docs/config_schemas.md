@@ -77,6 +77,9 @@ llm:
 stage_5_intelligence:
   max_items_default: 25
   input_max_chars: 12000
+
+stage_6_generate:
+  max_items_default: 25
 ```
 
 ### `stage_3_filter` Validation Rules
@@ -115,3 +118,6 @@ stage_5_intelligence:
 ### `stage_5_intelligence` Validation Rules
 - `max_items_default`: non-boolean integer >= `0`
 - `input_max_chars`: non-boolean integer >= `1`
+
+### `stage_6_generate` Validation Rules
+- `max_items_default`: non-boolean integer >= `0`

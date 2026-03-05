@@ -141,3 +141,6 @@ stage_4_enrich:
 stage_5_intelligence:
   max_items_default: 25
   input_max_chars: 12000
+
+stage_6_generate:
+  max_items_default: 25

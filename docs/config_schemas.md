@@ -80,6 +80,16 @@ stage_5_intelligence:
 
 stage_6_generate:
   max_items_default: 25
+
+sheets:
+  enabled: true
+  spreadsheet_id: "<google_sheet_id>"
+  worksheet_name: "Ideas"
+  key_column: "item_id"
+  header_row: 1
+
+stage_7_persist:
+  max_rows_default: 200
 ```
 
 ### `stage_3_filter` Validation Rules
@@ -121,3 +131,16 @@ stage_6_generate:
 
 ### `stage_6_generate` Validation Rules
 - `max_items_default`: non-boolean integer >= `0`
+
+### `sheets` Validation Rules
+- `enabled`: boolean
+- if `enabled` is `true`:
+  - `spreadsheet_id`: non-empty string after `strip()`
+  - `worksheet_name`: non-empty string after `strip()`
+  - `key_column`: non-empty string after `strip()`
+  - `header_row`: non-boolean integer >= `1`
+- if `enabled` is `false`:
+  - `spreadsheet_id`, `worksheet_name`, `key_column`, and `header_row` are optional
+
+### `stage_7_persist` Validation Rules
+- `max_rows_default`: non-boolean integer >= `0`

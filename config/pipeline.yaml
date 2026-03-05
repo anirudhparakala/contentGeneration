@@ -144,3 +144,13 @@ stage_5_intelligence:
 
 stage_6_generate:
   max_items_default: 25
+
+sheets:
+  enabled: false
+  spreadsheet_id: ""
+  worksheet_name: "Ideas"
+  key_column: "item_id"
+  header_row: 1
+
+stage_7_persist:
+  max_rows_default: 200
